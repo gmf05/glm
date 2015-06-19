@@ -25,7 +25,9 @@ d = glmdata([xs'; y'], time);
 % set parameters:
 p = glmparams();
 p = p.addCovar('intercept', 0, [0 1], 'indicator');
+% constant (= channel 0), [0 1] start/end of the interv
 p = p.addCovar('x', 1, [0], 'indicator');
+% channel 1, lag at 0
 p.response = 2;
 
 % fit model
@@ -105,7 +107,7 @@ Nparams = 7;
 X = ones(T, Nparams); % design matrix
 y = zeros(T, 1);
 b = zeros(Nparams, 1); % true coefficients
-b(1) = randn;
+% b(1) = randn;
 b(1) = 0;
 
 % covariate group 1 = self-history
@@ -114,8 +116,8 @@ b(1) = 0;
 knots = [1 10 20 30];
 bs = [0 0 0.8 0.5 0.1 0]';
 
-knots = [1 5 10];
-bs = [0 0.1 0.1 -0.05 0]';
+% knots = [1 5 10];
+% bs = [0 0.1 0.1 -0.05 0]';
 
 
 % bs = [0 0 -0.1 0.1 0 0]'; % oscillations
@@ -133,9 +135,11 @@ p.response = 1;
 % simulate data
 burnin = knots(end);
 % y(1:burnin) = b(1); 
-y(burnin) = b(1); 
+y(burnin) = b(1);
+n = 0.*y;
 for t = burnin+1:T
-  y(t) = b(1) + sum(y(t + [-lagtimes(end) : -lagtimes(1)]) .* lagcoeff) + 0.01 * randn;
+    n(t) = 0.1 * randn;
+  y(t) = b(1) + sum(y(t + [-lagtimes(end) : -lagtimes(1)]) .* lagcoeff) + n(t);
 end
 d = glmdata([y]', time);
 
@@ -145,9 +149,9 @@ m = m.fit(d,p);
 % 
 % % check model estimate
 figure
-plot(time, y, 'b'); hold on;
+plot(time, y-n, 'b'); hold on;
 % pause();
-% plot(time(burnin+1:end), m.yEst, 'r');
+plot(time(burnin+1:end), m.yEst, 'r');
 % 
 % % TODO: check the construction of design matrix 
 % % something seems wrong here
