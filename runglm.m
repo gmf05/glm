@@ -79,7 +79,7 @@ p.response = 2;
 burnin = knots(end);
 y(1:burnin) = b(1); 
 for t = burnin+1:T
-  y(t) = b(1) + sum(xs(t + [-lagtimes(end) : -lagtimes(1)]) .* lagcoeff);
+  y(t) = b(1) + sum(xs(t - [lagtimes(1) : lagtimes(end)]) .* lagcoeff);
 end
 d = glmdata([xs y]', time);
 
@@ -108,6 +108,7 @@ X = ones(T, Nparams); % design matrix
 y = zeros(T, 1);
 b = zeros(Nparams, 1); % true coefficients
 % b(1) = randn;
+% b(1) = 0.001*randn;
 b(1) = 0;
 
 % covariate group 1 = self-history
@@ -134,12 +135,10 @@ p.response = 1;
 
 % simulate data
 burnin = knots(end);
-% y(1:burnin) = b(1); 
-y(burnin) = b(1);
-n = 0.*y;
+% y(1:burnin) = b(1);
+y(burnin) = b(1); 
 for t = burnin+1:T
-    n(t) = 0.1 * randn;
-  y(t) = b(1) + sum(y(t + [-lagtimes(end) : -lagtimes(1)]) .* lagcoeff) + n(t);
+  y(t) = b(1) + sum(y(t - [lagtimes(1) : lagtimes(end)]) .* lagcoeff) + 0.0001 * randn;
 end
 d = glmdata([y]', time);
 
@@ -161,6 +160,69 @@ plot(time(burnin+1:end), m.yEst, 'r');
 % figure
 % m.plot(d,p)
 % subplot(212), plot(lagtimes, lagcoeff, 'r--', 'linewidth',2);
+
+%% example 3b (debugging intrinsic effects estimation)
+
+% generate synthetic data
+T = 5000;
+dt = 1e-3;
+time = (1:T)*dt;
+% Nparams = 7;
+Nparams = 14; % for asymmetric effects curve (below)
+X = ones(T, Nparams); % design matrix
+y = zeros(T, 1);
+b = zeros(Nparams, 1); % true coefficients
+% b(1) = 0.001*randn;
+b(1) = 0;
+
+% covariate group 1 = self-history
+% individual covariates are the states at different lags
+% 1. make function describing how y depends on lagged x
+% % knots = [1 10 20 30];
+% % bs = [0 0 0.8 0.5 0.1 0]';
+
+% asymmetric effects curve
+knots = [1 5:5:50];
+bs = [0 0 0.2 0.5 0.2 0 0.2 0.6 1 0.6 0.2 0 0]';
+
+
+% knots = [1 5 10];
+% bs = [0 0.1 0.1 -0.05 0]';
+
+
+% bs = [0 0 -0.1 0.1 0 0]'; % oscillations
+b(2:end) = bs;
+[lagtimes, lagcoeff] = plotspline(knots, bs);
+lagcoeff = 1 * lagcoeff / sum(lagcoeff);
+% figure, plot(lagtimes, lagcoeff);
+
+% set parameters:
+p = glmparams();
+p = p.addCovar('intercept', 0, [0 1], 'indicator');
+p = p.addCovar('self-history', 1, knots, 'spline');
+p.response = 1;
+
+% simulate data
+burnin = knots(end);
+% y(1:burnin) = b(1); 
+y(burnin) = b(1); 
+for t = burnin+1:T
+  y(t) = b(1) + sum(y(t - [lagtimes(1) : lagtimes(end)]) .* lagcoeff) + 0.0001 * randn;
+end
+d = glmdata([y]', time);
+
+% fit model
+m = glmodel();
+m = m.fit(d,p);
+% 
+
+% plot intrinsic effects estimate against true curve
+figure;
+plot(lagtimes,lagcoeff, 'b','linewidth',2);
+hold on;
+[~, lagcoeff_est] = plotspline(knots, m.coeff(2:end));
+plot(lagtimes,lagcoeff_est, 'r','linewidth',1);
+% plot(lagtimes,flipud(lagcoeff_est), 'r','linewidth',1);
 
 %% example 4 (voltage data)
 
@@ -267,9 +329,6 @@ p = p.addCovar('spatial4', neighbors(4), R_knots, R_basis);
 
 m = glmodel();
 m = m.fit(d, p);
-
-
-
 
 %% example 5 (hierarchy of models vs correlation)
 
