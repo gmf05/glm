@@ -70,8 +70,8 @@ b(2:end) = bs;
 
 % set parameters:
 p = glmparams();
-% p = p.addCovar('intercept', 0, [0 1], 'indicator');
-p = p.addCovar('intercept', 0, [0:0.2:1], 'spline');
+p = p.addCovar('intercept', 0, [0 1], 'indicator');
+% p = p.addCovar('intercept', 0, [0:0.2:1], 'spline');
 p = p.addCovar('x', 1, knots, 'spline');
 p.response = 2;
 
@@ -138,7 +138,7 @@ burnin = knots(end);
 % y(1:burnin) = b(1);
 y(burnin) = b(1); 
 for t = burnin+1:T
-  y(t) = b(1) + sum(y(t - [lagtimes(1) : lagtimes(end)]) .* lagcoeff) + 0.0001 * randn;
+  y(t) = b(1) + sum(y(t - [lagtimes(1) : lagtimes(end)]) .* lagcoeff) + 1 * randn;
 end
 d = glmdata([y]', time);
 
@@ -148,7 +148,7 @@ m = m.fit(d,p);
 % 
 % % check model estimate
 figure
-plot(time, y-n, 'b'); hold on;
+plot(time, y, 'b'); hold on;
 % pause();
 plot(time(burnin+1:end), m.yEst, 'r');
 % 
@@ -207,7 +207,7 @@ burnin = knots(end);
 % y(1:burnin) = b(1); 
 y(burnin) = b(1); 
 for t = burnin+1:T
-  y(t) = b(1) + sum(y(t - [lagtimes(1) : lagtimes(end)]) .* lagcoeff) + 0.0001 * randn;
+  y(t) = b(1) + sum(y(t - [lagtimes(1) : lagtimes(end)]) .* lagcoeff) + randn;
 end
 d = glmdata([y]', time);
 
