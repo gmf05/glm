@@ -10,7 +10,7 @@ classdef glmodel
     stats
     loglk % log-likelihood
     dev % deviance
-    AIC % Akaike information criterion (penalized log-likelihood)    
+    AIC % Akaike information criterion (log-likelihood penalized by number of parameters)
   end
   
   methods
@@ -223,34 +223,26 @@ classdef glmodel
     end
     
     function obj = calcGOF(obj, p)      
+      % choose PDF for likelihood calculations
       switch obj.link
-        % NOTE: Commented lines are specific to poisson/point process
-        % models
-% %         case 'log'
-% %           obj.loglk = sum(log(poisspdf(obj.y,obj.CIF)));
-% %           obj.dev = 2*(sum(log(poisspdf(obj.y,obj.y))) - obj.loglk);
-% %         case 'logit'
-% %           obj.loglk = sum(log(binopdf(obj.y,ones(size(obj.y)),obj.CIF)));
-% %           obj.dev = 2*(sum(log(binopdf(obj.y,ones(size(obj.y)),obj.y))) - obj.loglk);
+        case 'log'
+          ypdf = @(y1,y2)(poisspdf(y1,y2));
+          ylink = @(y)(exp(y));
+        case 'logit'
+          ypdf = @(y1,y2)(binopdf(y1,y2));
+          ylink = @(y)(exp(y)./(exp(y)+1));
         case 'identity'
-          % TODO: check/fix formula for log-likelihood
-          obj.loglk = sum(log(normpdf(obj.y, obj.X*obj.coeff, 1)));
-          obj.dev = 2* (sum(log(normpdf(obj.y, obj.y, 1))) - obj.loglk);
+          ypdf = @(y1,y2)(normpdf(y1,y2,1));
+          ylink = @(y)(y);
       end
-      obj.AIC = obj.dev+2*size(obj.coeff,1);
       
-% %       % time rescaling & KS test (NOTE: Should only be for poisson
-% %       % regression)
-% %       obj = obj.rescaled_ISI(); % compute rescaled ISI, add to object properties
-% %       [ks_stat,ks_ci,~,ks_p] = KStest(obj.y,obj.CIF); 
-% % %       [ks_stat,ks_ci,ks_p] % uncomment to check internal KStest against
-% % %       stat toolbox's kstest.m
-% % %       obj.KS = [ks_stat,ks_ci,ks_p];    
-% %       testx = 0:0.01:1; testcdf = unifcdf(testx,0,1); matcdf = [testx' testcdf'];
-% %       [~,ks_p,ks_stat,ks_ci] = kstest(obj.rsISI,'CDF',matcdf,'Alpha',0.05);
-% %       obj.KS = [ks_stat,ks_ci,ks_p];      
-% % %       [ks_stat,ks_ci,ks_p] % uncomment to check internal KStest against
-% % %       stat toolbox's kstest.m
+      % NOTE: negative sign in deviance has been distributed
+      % it is ( saturated - estimated ) instead of ( est - sat )
+%       obj.loglk = sum(log(ypdf(obj.y, ylink(obj.X*obj.coeff))));
+      obj.loglk = sum(log(ypdf(obj.y, obj.X*obj.coeff)));
+      obj.dev = 2* (sum(log(ypdf(obj.y, obj.y))) - obj.loglk);
+      
+      obj.AIC = obj.dev+2*size(obj.coeff,1);
       
     end
     
@@ -377,16 +369,6 @@ classdef glmodel
       else y = y_in; end;
 
       % starting values:
-% %       switch distr
-% %       case 'poisson'
-% %           mu = y + 0.25;
-% %       case 'binomial'
-% %           mu = (N .* y + 0.5) ./ (N + 1);
-% %       case {'gamma' 'inverse gaussian'}
-% %           mu = max(y, eps(class(y))); % somewhat arbitrary
-% %       otherwise
-% %           mu = y;
-% %       end
       switch link
         case 'identity'
           linkFn = @(x) x;
@@ -400,6 +382,17 @@ classdef glmodel
           linkFnprime = @(x) 1./x;     
           sqrtvarFn = @(x) sqrt(x);
           mu = y + 0.25; % initial conditions
+%         case 'logit'
+%           linkFn = @(x) log(x./(1-x));
+%           ilinkFn = @(x) exp(x)./(1+exp(x));
+% %           linkFnprime = @(x) 1./x;
+% %           sqrtvarFn = @(x) sqrt(x);
+% %           mu = (N .* y + 0.5) ./ (N + 1); % initial conditions
+%         case {'gamma', 'invgamma'}
+%           0;
+%         otherwise
+%           mu = y;
+
       end
       
       N = size(X,1);
